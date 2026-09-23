@@ -1,0 +1,95 @@
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background-color: #f4f6f8;
+    text-align: center;
+}
+
+
+.container {
+    max-width: 700px;
+    margin: 50px auto;
+    padding: 30px;
+}
+
+
+h1 {
+    font-size: 40px;
+    margin-bottom: 10px;
+}
+
+
+.description {
+    font-size: 18px;
+    margin-bottom: 30px;
+}
+
+
+#drawingCanvas {
+    display: block;
+
+    margin: 0 auto;
+
+    border: 3px solid black;
+
+    border-radius: 10px;
+
+    background-color: white;
+
+    cursor: crosshair;
+
+    max-width: 100%;
+}
+
+
+.buttons {
+    margin-top: 20px;
+}
+
+
+button {
+    margin: 5px;
+
+    padding: 12px 24px;
+
+    border: none;
+
+    border-radius: 6px;
+
+    font-size: 16px;
+
+    cursor: pointer;
+}
+
+
+#clearButton {
+    background-color: #dddddd;
+}
+
+
+#predictButton {
+    background-color: #222222;
+    color: white;
+}
+
+
+button:hover {
+    opacity: 0.8;
+}
+
+
+#prediction {
+    margin-top: 30px;
+}
+
+
+#confidence {
+    font-size: 18px;
+}
+
+
+.info {
+    margin-top: 40px;
+    font-size: 14px;
+    color: #666666;
+}

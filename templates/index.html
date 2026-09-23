@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        Handwriting AI
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+    <main class="container">
+
+        <h1>
+            Handwriting AI
+        </h1>
+
+
+        <p class="description">
+            Draw a digit from 0 to 9 and let my
+            neural network try to recognise it.
+        </p>
+
+
+        <canvas
+            id="drawingCanvas"
+            width="500"
+            height="250">
+        </canvas>
+
+
+        <div class="buttons">
+
+            <button id="clearButton">
+                Clear
+            </button>
+
+
+            <button id="predictButton">
+                Recognise
+            </button>
+
+        </div>
+
+
+        <h2 id="prediction">
+            Prediction: —
+        </h2>
+
+
+        <p id="confidence">
+        </p>
+
+
+        <p class="info">
+            Built with Flask, JavaScript and PyTorch.
+            The CNN was trained on the MNIST
+            handwritten digit dataset.
+        </p>
+
+    </main>
+
+
+    <script
+        src="{{ url_for('static', filename='script.js') }}">
+    </script>
+
+</body>
+
+</html>

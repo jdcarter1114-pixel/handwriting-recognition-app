@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+
+data/
+
+received_image.png
+grayscale_image.png
+cropped_image.png
+resized_image.png
+model_input.png
