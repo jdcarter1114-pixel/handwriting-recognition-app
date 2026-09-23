@@ -3,4 +3,3 @@ gunicorn
 numpy
 Pillow
 torch
-torchvision
