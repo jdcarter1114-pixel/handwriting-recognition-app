@@ -2,13 +2,11 @@ import base64
 import io
 
 import numpy as np
-import torch
+import onnxruntime as ort
 
 from PIL import Image
 
 from flask import Flask, render_template, request
-
-from model import HandwritingCNN
 
 
 # ==========================================
@@ -19,21 +17,12 @@ app = Flask(__name__)
 
 
 # ==========================================
-# LOAD MODEL
+# LOAD ONNX MODEL
 # ==========================================
 
-model = HandwritingCNN()
-
-
-model.load_state_dict(
-    torch.load(
-        "handwriting_model.pth",
-        map_location="cpu"
-    )
+session = ort.InferenceSession(
+    "handwriting_model.onnx"
 )
-
-
-model.eval()
 
 
 # ==========================================
@@ -58,9 +47,11 @@ def home():
 )
 def predict():
 
-    # Get JSON from JavaScript
-    data = request.get_json()
+    # --------------------------------------
+    # RECEIVE IMAGE
+    # --------------------------------------
 
+    data = request.get_json()
 
     if not data or "image" not in data:
 
@@ -72,9 +63,9 @@ def predict():
     image_data = data["image"]
 
 
-    # ======================================
-    # DECODE IMAGE
-    # ======================================
+    # --------------------------------------
+    # DECODE BASE64 IMAGE
+    # --------------------------------------
 
     try:
 
@@ -98,9 +89,9 @@ def predict():
         }, 400
 
 
-    # ======================================
-    # WHITE BACKGROUND
-    # ======================================
+    # --------------------------------------
+    # ADD WHITE BACKGROUND
+    # --------------------------------------
 
     background = Image.new(
         "RGBA",
@@ -108,43 +99,40 @@ def predict():
         "white"
     )
 
-
     background.alpha_composite(
         image.convert("RGBA")
     )
 
 
-    # ======================================
+    # --------------------------------------
     # GRAYSCALE
-    # ======================================
+    # --------------------------------------
 
     grayscale_image = background.convert(
         "L"
     )
 
 
-    # ======================================
-    # NUMPY ARRAY
-    # ======================================
+    # --------------------------------------
+    # CONVERT TO NUMPY
+    # --------------------------------------
 
     image_array = np.array(
         grayscale_image
     )
 
 
-    # ======================================
+    # --------------------------------------
     # FIND HANDWRITING
-    # ======================================
+    # --------------------------------------
 
     ink_pixels = image_array < 250
-
 
     rows, columns = np.where(
         ink_pixels
     )
 
 
-    # Blank canvas
     if len(rows) == 0:
 
         return {
@@ -152,9 +140,9 @@ def predict():
         }
 
 
-    # ======================================
-    # BOUNDING BOX
-    # ======================================
+    # --------------------------------------
+    # FIND BOUNDING BOX
+    # --------------------------------------
 
     top = rows.min()
     bottom = rows.max()
@@ -163,9 +151,9 @@ def predict():
     right = columns.max()
 
 
-    # ======================================
+    # --------------------------------------
     # CROP
-    # ======================================
+    # --------------------------------------
 
     cropped_image = grayscale_image.crop(
         (
@@ -177,15 +165,11 @@ def predict():
     )
 
 
-    # ======================================
+    # --------------------------------------
     # PRESERVE ASPECT RATIO
-    # ======================================
+    # --------------------------------------
 
     width, height = cropped_image.size
-
-
-    # MNIST digits fit inside roughly
-    # a 20 x 20 region of a 28 x 28 image.
 
     max_size = 20
 
@@ -226,9 +210,9 @@ def predict():
     )
 
 
-    # ======================================
-    # CREATE 28 x 28 WHITE IMAGE
-    # ======================================
+    # --------------------------------------
+    # CREATE 28 x 28 IMAGE
+    # --------------------------------------
 
     final_image = Image.new(
         "L",
@@ -237,7 +221,6 @@ def predict():
     )
 
 
-    # Centre digit
     x_position = (
         28 - new_width
     ) // 2
@@ -256,9 +239,9 @@ def predict():
     )
 
 
-    # ======================================
-    # CONVERT TO NUMPY
-    # ======================================
+    # --------------------------------------
+    # NORMALISE
+    # --------------------------------------
 
     final_array = np.array(
         final_image
@@ -267,92 +250,117 @@ def predict():
     )
 
 
-    # ======================================
-    # NORMALISE
-    # ======================================
-
     final_array = (
         final_array /
         255.0
     )
 
 
-    # ======================================
-    # INVERT
-    # ======================================
-
-    # White background -> 0
-    # Dark handwriting -> 1
-
+    # MNIST has white digits on
+    # a black background
     final_array = (
         1.0 -
         final_array
     )
 
 
-    # ======================================
-    # PYTORCH TENSOR
-    # ======================================
+    # --------------------------------------
+    # CREATE CNN INPUT
+    # --------------------------------------
 
-    tensor = torch.tensor(
+    # Current shape:
+    #
+    # [28, 28]
+    #
+    # ONNX expects:
+    #
+    # [1, 1, 28, 28]
+
+    final_array = np.expand_dims(
         final_array,
-        dtype=torch.float32
+        axis=0
     )
 
 
-    # [28, 28]
-    # ->
-    # [1, 28, 28]
-
-    tensor = tensor.unsqueeze(0)
-
-
-    # [1, 28, 28]
-    # ->
-    # [1, 1, 28, 28]
-
-    tensor = tensor.unsqueeze(0)
+    final_array = np.expand_dims(
+        final_array,
+        axis=0
+    )
 
 
-    # ======================================
-    # PREDICTION
-    # ======================================
+    # --------------------------------------
+    # ONNX PREDICTION
+    # --------------------------------------
 
-    with torch.no_grad():
+    outputs = session.run(
+        None,
+        {
+            "input": final_array
+        }
+    )
 
-        outputs = model(
-            tensor
+
+    # outputs[0] contains the CNN logits
+    logits = outputs[0]
+
+
+    prediction = int(
+        np.argmax(
+            logits,
+            axis=1
+        )[0]
+    )
+
+
+    # --------------------------------------
+    # CALCULATE CONFIDENCE
+    # --------------------------------------
+
+    # Convert logits to probabilities
+    # using softmax.
+
+    shifted_logits = (
+        logits -
+        np.max(
+            logits,
+            axis=1,
+            keepdims=True
         )
+    )
 
 
-        probabilities = torch.softmax(
-            outputs,
-            dim=1
+    exponentials = np.exp(
+        shifted_logits
+    )
+
+
+    probabilities = (
+        exponentials /
+        np.sum(
+            exponentials,
+            axis=1,
+            keepdims=True
         )
+    )
 
 
-        prediction = torch.argmax(
-            probabilities,
-            dim=1
-        ).item()
-
-
-        confidence = probabilities[
+    confidence = float(
+        probabilities[
             0,
             prediction
-        ].item()
+        ]
+    )
 
 
-    # Convert confidence to percentage
     confidence = round(
         confidence * 100,
         1
     )
 
 
-    # ======================================
-    # SEND RESULT TO JAVASCRIPT
-    # ======================================
+    # --------------------------------------
+    # RETURN RESULT
+    # --------------------------------------
 
     return {
         "prediction": prediction,
@@ -361,7 +369,7 @@ def predict():
 
 
 # ==========================================
-# RUN APPLICATION
+# RUN LOCALLY
 # ==========================================
 
 if __name__ == "__main__":
